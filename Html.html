@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List with User Authentication</title>
+    <style>
+        /* General styling */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        body.dark-mode {
+            background-color: #333;
+            color: #fff;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        body.dark-mode .container {
+            background-color: #444;
+            color: #fff;
+        }
+        input[type="text"], input[type="password"], select, input[type="date"], textarea {
+            width: 80%;
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        li.completed {
+            text-decoration: line-through;
+            color: #aaa;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #ccc;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .progress-bar div {
+            height: 100%;
+            background-color: #5cb85c;
+            border-radius: 5px;
+        }
+        .clear-all {
+            margin-top: 20px;
+            background-color: #d9534f;
+        }
+        .dark-mode-toggle {
+            margin-bottom: 20px;
+        }
+        .priority-low { color: green; }
+        .priority-medium { color: orange; }
+        .priority-high { color: red; }
+        .auth-container {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>To-Do List with User Authentication</h1>
+        
+        <!-- User Authentication Section -->
+        <div id="authContainer" class="auth-container">
+            <h2>Register or Login</h2>
+            <input type="text" id="username" placeholder="Username" required />
+            <input type="password" id="password" placeholder="Password" required />
+            <button onclick="register()">Register</button>
+            <button onclick="login()">Login</button>
+            <p id="authMessage"></p>
+        </div>
+
+        <!-- Todo List Section (Hidden by default) -->
+        <div id="todoContainer" style="display:none;">
+            <button onclick="logout()">Logout</button>
+            <h2 id="welcomeMessage"></h2>
+            
+            <!-- Dark Mode Toggle -->
+            <div class="dark-mode-toggle">
+                <label for="darkModeToggle">Dark Mode: </label>
+                <input type="checkbox" id="darkModeToggle" onclick="toggleDarkMode()">
+            </div>
+
+            <!-- Task Input Fields -->
+            <input type="text" id="taskInput" placeholder="Add a new task..." />
+            <textarea id="taskDescription" placeholder="Task description..."></textarea>
+            <input type="date" id="taskDate" />
+            <select id="taskCategory">
+                <option value="Work">Work</option>
+                <option value="Personal">Personal</option>
+            </select>
+            <select id="taskPriority">
+                <option value="Low">Low Priority</option>
+                <option value="Medium">Medium Priority</option>
+                <option value="High">High Priority</option>
+            </select>
+            <select id="taskRecurring">
+                <option value="None">No Recurrence</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+            </select>
+            <input type="text" id="taskSubtask" placeholder="Add subtask..." />
+            <button onclick="addTask()">Add Task</button>
+
+            <!-- Search Tasks -->
+            <input type="text" id="searchInput" onkeyup="searchTasks()" placeholder="Search tasks...">
+            
+            <!-- Task List -->
+            <ul id="taskList"></ul>
+            
+            <!-- Clear All Tasks Button -->
+            <button class="clear-all" onclick="clearAllTasks()">Clear All</button>
+
+            <!-- Progress Bar -->
+            <div class="progress-bar"><div id="progressFill"></div></div>
+        </div>
+    </div>
+
+    <script>
+        // Retrieve users data from localStorage or initialize as an empty object
+        const users = JSON.parse(localStorage.getItem("users")) || {};
+
+        // Function to handle user registration
+        function register() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            
+            // Check if both username and password are provided
+            if (!username || !password) {
+                alert("Please enter both a username and a password.");
+                return;
+            }
+            
+            // Check if username already exists
+            if (users[username]) {
+                alert("Username already exists. Please choose another one.");
+                return;
+            }
+
+            // Save new user to localStorage
+            users[username] = { password, tasks: [] };
+            localStorage.setItem("users", JSON.stringify(users));
+            alert("Registration successful! Please log in.");
+        }
+
+        // Function to handle user login
+        function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            // Check if both username and password are entered
+            if (!username || !password) {
+                alert("Please enter both a username and a password.");
+                return;
+            }
+
+            // Verify username and password match
+            if (users[username] && users[username].password === password) {
+                localStorage.setItem("loggedInUser", username);
+                showTodoApp(); // Show to-do list after successful login
+            } else {
+                alert("Incorrect username or password.");
+            }
+        }
+
+        // Show the To-Do List UI when logged in
+        function showTodoApp() {
+            const username = localStorage.getItem("loggedInUser");
+            if (!username) return;
+
+            // Hide authentication form and show the to-do app container
+            document.getElementById("authContainer").style.display = "none";
+            document.getElementById("todoContainer").style.display = "block";
+            document.getElementById("welcomeMessage").textContent = `Welcome, ${username}!`;
+
+            loadTasks(); // Load the tasks for the logged-in user
+        }
+
+        // Function to logout user
+        function logout() {
+            localStorage.removeItem("loggedInUser"); // Clear logged-in user data from localStorage
+            document.getElementById("authContainer").style.display = "block"; // Show login form
+            document.getElementById("todoContainer").style.display = "none"; // Hide to-do app container
+            document.getElementById("taskList").innerHTML = ""; // Clear task list
+        }
+
+        // Function to add a new task
+        function addTask() {
+            const username = localStorage.getItem("loggedInUser");
+            if (!username) return;
+
+            const taskInput = document.getElementById("taskInput").value;
+            const taskDescription = document.getElementById("taskDescription").value;
+            const taskDate = document.getElementById("taskDate").value;
+            const taskCategory = document.getElementById("taskCategory").value;
+            const taskPriority = document.getElementById("taskPriority").value;
+            const taskRecurring = document.getElementById("taskRecurring").value;
+            const taskSubtask = document.getElementById("taskSubtask").value;
+
+            if (!taskInput.trim()) {
+                alert("Please enter a task.");
+                return;
+            }
+
+            // Create a new task object
+            const task = {
+                text: taskInput,
+                description: taskDescription,
+                date: taskDate,
+                category: taskCategory,
+                priority: taskPriority,
+                recurring: taskRecurring,
+                subtask: taskSubtask,
+                completed: false
+            };
+
+            // Add task to the user's tasks and save to localStorage
+            users[username].tasks.push(task);
+            localStorage.setItem("users", JSON.stringify(users));
+            displayTask(task); // Display the newly added task
+            updateProgress(); // Update task completion progress
+
+            // Clear input fields after adding a task
+            document.getElementById("taskInput").value = "";
+            document.getElementById("taskDescription").value = "";
+            document.getElementById("taskDate").value = "";
+            document.getElementById("taskSubtask").value = "";
+        }
+
+        // Load tasks for the logged-in user and display them
+        function loadTasks() {
+            const username = localStorage.getItem("loggedInUser");
+            if (!username) return;
+
+            document.getElementById("taskList").innerHTML = ""; // Clear existing tasks on screen
+
+            const tasks = users[username].tasks;
+            tasks.forEach(task => displayTask(task));
+            updateProgress(); // Update progress bar
+        }
+
+        // Display individual task in the task list
+        function displayTask(task) {
+            const username = localStorage.getItem("loggedInUser");
+            const taskList = document.getElementById("taskList");
+            const li = document.createElement("li");
+            li.className = `priority-${task.priority.toLowerCase()}`; // Set the priority class
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = task.completed;
+            checkbox.onclick = function() {
+                task.completed = checkbox.checked;
+                li.classList.toggle("completed"); // Mark task as completed/incomplete
+                updateProgress(); // Update task completion progress
+            };
+
+            const taskDetails = document.createElement("span");
+            taskDetails.textContent = `${task.text} (Due: ${task.date}, ${task.category}, Priority: ${task.priority})`;
+
+            const description = document.createElement("p");
+            description.textContent = `Description: ${task.description}`;
+            
+            const subtask = document.createElement("p");
+            subtask.textContent = `Subtask: ${task.subtask}`;
+
+            const deleteButton = document.createElement("button");
+            deleteButton.textContent = "Delete";
+            deleteButton.onclick = function() {
+                const taskIndex = users[username].tasks.indexOf(task);
+                if (taskIndex > -1) {
+                    users[username].tasks.splice(taskIndex, 1); // Remove task from user's tasks
+                    localStorage.setItem("users", JSON.stringify(users));
+                    taskList.removeChild(li); // Remove task from UI
+                    updateProgress(); // Update progress bar
+                }
+            };
+
+            // Append task details and delete button to the list item
+            li.appendChild(checkbox);
+            li.appendChild(taskDetails);
+            li.appendChild(description);
+            li.appendChild(subtask);
+            li.appendChild(deleteButton);
+            taskList.appendChild(li);
+        }
+
+        // Function to clear all tasks
+        function clearAllTasks() {
+            const username = localStorage.getItem("loggedInUser");
+            if (!username) return;
+
+            if (confirm("Are you sure you want to clear all tasks?")) {
+                users[username].tasks = []; // Clear all tasks for the user
+                localStorage.setItem("users", JSON.stringify(users));
+                document.getElementById("taskList").innerHTML = ""; // Clear task list from UI
+                updateProgress(); // Update progress bar
+            }
+        }
+
+        // Function to search tasks based on input
+        function searchTasks() {
+            const searchValue = document.getElementById("searchInput").value.toLowerCase();
+            const tasks = document.querySelectorAll("#taskList li");
+            tasks.forEach(task => {
+                const taskText = task.textContent.toLowerCase();
+                task.style.display = taskText.includes(searchValue) ? "" : "none"; // Show/hide tasks based on search
+            });
+        }
+
+        // Function to toggle dark mode
+        function toggleDarkMode() {
+            document.body.classList.toggle("dark-mode"); // Toggle the dark mode class on the body element
+        }
+
+        // Function to update the progress bar based on task completion
+        function updateProgress() {
+            const username = localStorage.getItem("loggedInUser");
+            if (!username) return;
+
+            const tasks = users[username].tasks;
+            const completedTasks = tasks.filter(task => task.completed).length; // Count completed tasks
+            const totalTasks = tasks.length;
+            const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+            document.getElementById("progressFill").style.width = `${progress}%`; // Update progress bar width
+        }
+
+        // Load user data and show To-Do App if user is already logged in
+        document.addEventListener("DOMContentLoaded", () => {
+            const username = localStorage.getItem("loggedInUser");
+            if (username) showTodoApp();
+            
+        });
+    </script>
+</body>
+</html>
